@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Söhne:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --claude:#f5a623; --openai:#19c37d; --gemini:#4A90D9; --grok:#ccc;
+  --judge:#bf7fff; --danger:#ff6b6b; --imggen:#f472b6;
+  --r:20px; --rsm:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#000;color:#fff;height:100dvh;overflow:hidden;}
+
+/* BG */
+.bg{position:fixed;inset:0;z-index:0;background:linear-gradient(135deg,#0d0d1a,#0a0a12,#0d0818);overflow:hidden;}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;animation:drift 12s ease-in-out infinite alternate;}
+.bg-orb:nth-child(1){width:400px;height:400px;background:radial-gradient(circle,#f5a62320,transparent);top:-100px;left:-100px;animation-duration:14s;}
+.bg-orb:nth-child(2){width:350px;height:350px;background:radial-gradient(circle,#4A90D920,transparent);bottom:100px;right:-80px;animation-duration:10s;animation-delay:-4s;}
+.bg-orb:nth-child(3){width:300px;height:300px;background:radial-gradient(circle,#bf7fff15,transparent);top:40%;left:30%;animation-duration:16s;animation-delay:-8s;}
+@keyframes drift{from{transform:translate(0,0) scale(1);}to{transform:translate(30px,20px) scale(1.1);}}
+
+/* SHELL */
+#app{position:relative;z-index:1;max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;flex-shrink:0;background:rgba(0,0,0,.55);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border-bottom:1px solid rgba(255,255,255,.08);z-index:50;}
+.logo{font-size:19px;font-weight:700;letter-spacing:-.5px;color:#fff;}
+.logo em{font-style:normal;color:var(--claude);}
+.header-actions{display:flex;gap:7px;}
+.icon-btn{width:33px;height:33px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;}
+.icon-btn:active{transform:scale(.9);background:rgba(255,255,255,.18);}
+.icon-btn.active-btn{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);}
+
+/* TABS */
+.tabs-bar{display:flex;align-items:center;padding:9px 13px;gap:7px;flex-shrink:0;background:rgba(0,0,0,.4);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.06);z-index:49;}
+.tab{flex:1;height:34px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:500;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.38);transition:all .2s;white-space:nowrap;user-select:none;}
+.tab.active{color:#fff;border-color:transparent;}
+.tab[data-mode="select"].active{background:linear-gradient(135deg,rgba(245,166,35,.28),rgba(245,166,35,.1));border-color:rgba(245,166,35,.38);}
+.tab[data-mode="all"].active{background:linear-gradient(135deg,rgba(74,144,217,.28),rgba(74,144,217,.1));border-color:rgba(74,144,217,.38);}
+.tab[data-mode="judge"].active{background:linear-gradient(135deg,rgba(191,127,255,.28),rgba(191,127,255,.1));border-color:rgba(191,127,255,.38);}
+.tab[data-mode="imagine"].active{background:linear-gradient(135deg,rgba(244,114,182,.28),rgba(244,114,182,.1));border-color:rgba(244,114,182,.38);}
+
+/* MODEL PILLS */
+.model-pills{display:flex;gap:7px;padding:8px 13px 7px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(255,255,255,.05);}
+.model-pills::-webkit-scrollbar{display:none;}
+.model-pill{flex-shrink:0;padding:5px 12px 5px 9px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.35);transition:all .18s;display:flex;align-items:center;gap:7px;user-select:none;}
+.model-pill svg{flex-shrink:0;}
+.model-pill.sel{color:#fff;}
+.model-pill[data-model="claude"].sel{background:rgba(245,166,35,.18);border-color:rgba(245,166,35,.45);font-family:'Copernicus','Georgia',serif;letter-spacing:-.2px;}
+.model-pill[data-model="openai"].sel{background:rgba(25,195,125,.18);border-color:rgba(25,195,125,.45);font-family:'Söhne','Inter',sans-serif;}
+.model-pill[data-model="gemini"].sel{background:rgba(74,144,217,.18);border-color:rgba(74,144,217,.45);font-family:'Google Sans','Inter',sans-serif;}
+.model-pill[data-model="grok"].sel{background:rgba(200,200,200,.12);border-color:rgba(200,200,200,.35);font-family:'Inter',sans-serif;letter-spacing:-.3px;}
+
+/* CHAT SCROLL */
+.chat-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:13px 13px 8px;-webkit-overflow-scrolling:touch;}
+.chat-scroll::-webkit-scrollbar{width:3px;}
+.chat-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+.chat-pane{display:none;}
+.chat-pane.active{display:block;}
+
+/* EMPTY STATE */
+.empty-state{display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:10px;text-align:center;}
+.empty-icon{font-size:38px;opacity:.22;margin-bottom:4px;}
+.empty-title{font-size:16px;font-weight:600;color:rgba(255,255,255,.28);}
+.empty-sub{font-size:12.5px;color:rgba(255,255,255,.16);line-height:1.6;max-width:220px;}
+
+/* MESSAGES */
+.message-group{margin-bottom:16px;}
+.user-msg{display:flex;justify-content:flex-end;margin-bottom:9px;}
+.user-bubble{max-width:78%;background:rgba(255,255,255,.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.14);border-radius:18px 18px 5px 18px;padding:10px 13px;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.92);}
+.user-bubble img{max-width:100%;border-radius:10px;margin-top:7px;display:block;}
+.user-bubble .attach-name{font-size:11.5px;color:rgba(255,255,255,.5);margin-top:5px;display:flex;align-items:center;gap:5px;}
+
+.responses-grid{display:flex;flex-direction:column;gap:9px;}
+.response-card{border-radius:var(--r);overflow:hidden;background:rgba(255,255,255,.05);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,.09);transition:border-color .25s;}
+.response-card.winner{border-color:rgba(191,127,255,.45);box-shadow:0 0 22px rgba(191,127,255,.12);}
+.response-card.claude-card{border-left:2.5px solid var(--claude);}
+.response-card.openai-card{border-left:2.5px solid var(--openai);}
+.response-card.gemini-card{border-left:2.5px solid var(--gemini);}
+.response-card.grok-card{border-left:2.5px solid var(--grok);}
+.response-card.judge-card{border-left:2.5px solid var(--judge);}
+.response-card.imggen-card{border-left:2.5px solid var(--imggen);}
+
+.response-header{display:flex;align-items:center;gap:8px;padding:9px 13px 7px;border-bottom:1px solid rgba(255,255,255,.06);}
+.response-model{font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
+.response-model.claude{color:var(--claude);}
+.response-model.openai{color:var(--openai);}
+.response-model.gemini{color:var(--gemini);}
+.response-model.grok{color:var(--grok);}
+.response-model.judge{color:var(--judge);}
+.response-model.imggen{color:var(--imggen);}
+.winner-badge{margin-left:auto;background:rgba(191,127,255,.2);border:1px solid rgba(191,127,255,.4);color:#d9aaff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;}
+.response-body{padding:10px 13px;font-size:13.5px;line-height:1.68;color:rgba(255,255,255,.85);white-space:pre-wrap;word-break:break-word;}
+.error-text{color:var(--danger);font-size:12px;padding:10px 13px;line-height:1.5;}
+.loading-dots{display:flex;gap:5px;padding:12px 13px;}
+.loading-dots span{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.3);animation:pulse 1.2s ease-in-out infinite;}
+.loading-dots span:nth-child(2){animation-delay:.2s;}
+.loading-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes pulse{0%,80%,100%{opacity:.2;transform:scale(.75);}40%{opacity:1;transform:scale(1);}}
+.gen-img{max-width:100%;border-radius:12px;display:block;margin:10px 13px;}
+
+/* JUDGE BANNER */
+.judge-banner{margin-bottom:11px;padding:9px 13px;background:rgba(191,127,255,.07);border:1px solid rgba(191,127,255,.18);border-radius:var(--rsm);font-size:12.5px;color:rgba(255,255,255,.45);line-height:1.5;}
+.judge-banner strong{color:var(--judge);}
+
+/* INPUT BAR */
+.input-bar{flex-shrink:0;padding:9px 13px 22px;background:rgba(0,0,0,.55);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border-top:1px solid rgba(255,255,255,.07);z-index:50;}
+.attach-preview{display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:6px 10px;background:rgba(255,255,255,.07);border-radius:10px;border:1px solid rgba(255,255,255,.1);}
+.attach-preview img{width:36px;height:36px;object-fit:cover;border-radius:6px;}
+.attach-preview .att-name{font-size:12px;color:rgba(255,255,255,.6);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.attach-preview .att-remove{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.input-row{display:flex;gap:9px;align-items:flex-end;}
+.input-left{display:flex;gap:6px;align-items:flex-end;}
+.attach-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0;}
+.attach-btn:active{background:rgba(255,255,255,.16);}
+.input-wrap{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:22px;overflow:hidden;transition:border-color .2s,background .2s;}
+.input-wrap:focus-within{border-color:rgba(245,166,35,.5);background:rgba(255,255,255,.1);}
+textarea{width:100%;padding:10px 15px;background:transparent;border:none;outline:none;color:#fff;font-family:'Inter',-apple-system,sans-serif;font-size:15px;resize:none;max-height:110px;line-height:1.5;}
+textarea::placeholder{color:rgba(255,255,255,.27);}
+.send-btn{width:40px;height:40px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--claude),#e8942a);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;color:#fff;box-shadow:0 4px 14px rgba(245,166,35,.28);}
+.send-btn:active{transform:scale(.9);}
+.send-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
+
+/* IMAGE MODEL BAR */
+.img-model-bar{display:flex;gap:7px;padding:8px 13px 7px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(255,255,255,.05);}
+.img-model-bar::-webkit-scrollbar{display:none;}
+.img-model-pill{flex-shrink:0;padding:5px 12px 5px 9px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.35);transition:all .18s;display:flex;align-items:center;gap:6px;user-select:none;}
+.img-model-pill.sel{color:#fff;}
+.img-model-pill[data-imgmodel="openai"].sel{background:rgba(25,195,125,.18);border-color:rgba(25,195,125,.45);}
+.img-model-pill[data-imgmodel="gemini"].sel{background:rgba(74,144,217,.18);border-color:rgba(74,144,217,.45);}
+.img-model-pill[data-imgmodel="grok"].sel{background:rgba(200,200,200,.12);border-color:rgba(200,200,200,.35);}
+.img-model-pill[data-imgmodel="all"].sel{background:rgba(244,114,182,.2);border-color:rgba(244,114,182,.45);color:#fff;}
+.img-result-group{margin-bottom:14px;}
+.img-result-label{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px;padding:0 2px;}
+.img-result-label.openai{color:var(--openai);}
+.img-result-label.gemini{color:var(--gemini);}
+.img-result-label.grok{color:var(--grok);}
+.img-prompt-bubble{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:12px 12px 12px 4px;padding:8px 12px;font-size:12.5px;color:rgba(255,255,255,.6);margin-bottom:10px;line-height:1.4;}
+
+/* IMAGE GEN PANE */
+.imagine-pane{display:none;flex-direction:column;height:100%;}
+.imagine-pane.active{display:flex;}
+.imagine-scroll{flex:1;overflow-y:auto;padding:13px;}
+.imagine-scroll::-webkit-scrollbar{width:3px;}
+.imagine-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+.img-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.img-card{border-radius:14px;overflow:hidden;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);cursor:pointer;transition:transform .15s;}
+.img-card:active{transform:scale(.97);}
+.img-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;}
+.img-card .img-caption{padding:7px 9px;font-size:11px;color:rgba(255,255,255,.4);line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.img-loading{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:rgba(244,114,182,.06);border:1px dashed rgba(244,114,182,.3);border-radius:14px;}
+.img-err{padding:10px 12px;font-size:12px;color:var(--danger);background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.2);border-radius:12px;margin-bottom:8px;}
+.imagine-input-bar{flex-shrink:0;padding:9px 13px 22px;background:rgba(0,0,0,.55);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border-top:1px solid rgba(255,255,255,.07);}
+.imagine-row{display:flex;gap:9px;align-items:flex-end;}
+.imagine-input{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:22px;overflow:hidden;transition:border-color .2s;}
+.imagine-input:focus-within{border-color:rgba(244,114,182,.5);}
+.imagine-input textarea{font-size:14.5px;}
+.imagine-btn{width:40px;height:40px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#f472b6,#ec4899);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;color:#fff;box-shadow:0 4px 14px rgba(244,114,182,.28);}
+.imagine-btn:active{transform:scale(.9);}
+.imagine-btn:disabled{opacity:.3;cursor:not-allowed;}
+.imagine-empty{display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:10px;text-align:center;}
+.imagine-empty .empty-icon{font-size:38px;opacity:.22;}
+.imagine-empty .empty-title{font-size:16px;font-weight:600;color:rgba(255,255,255,.28);}
+.imagine-empty .empty-sub{font-size:12.5px;color:rgba(255,255,255,.16);line-height:1.6;max-width:220px;}
+
+/* HISTORY SIDEBAR */
+.history-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s;}
+.history-overlay.open{opacity:1;pointer-events:all;}
+.history-panel{position:absolute;right:0;top:0;bottom:0;width:82%;max-width:360px;background:rgba(12,12,20,.97);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border-left:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);}
+.history-overlay.open .history-panel{transform:translateX(0);}
+.history-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;border-bottom:1px solid rgba(255,255,255,.08);}
+.history-head h2{font-size:17px;font-weight:700;}
+.history-close{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.history-tabs{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);}
+.h-tab{flex:1;padding:6px;border-radius:10px;font-size:11.5px;font-weight:600;text-align:center;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.35);transition:all .18s;}
+.h-tab.active{color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);}
+.history-list{flex:1;overflow-y:auto;padding:8px 12px;}
+.history-list::-webkit-scrollbar{width:3px;}
+.history-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+.h-session{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);margin-bottom:8px;cursor:pointer;transition:all .15s;}
+.h-session:active{background:rgba(255,255,255,.1);}
+.h-session-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.85);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.h-session-meta{font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:8px;}
+.h-session-del{float:right;width:22px;height:22px;border-radius:50%;background:rgba(255,80,80,.15);border:none;color:rgba(255,100,100,.7);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:-2px;}
+.h-empty{text-align:center;padding:40px 20px;color:rgba(255,255,255,.2);font-size:13px;}
+.new-chat-btn{margin:10px 12px;padding:11px;background:rgba(255,255,255,.07);border:1px dashed rgba(255,255,255,.15);border-radius:12px;color:rgba(255,255,255,.5);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
+.new-chat-btn:active{background:rgba(255,255,255,.12);}
+
+/* SETTINGS */
+.settings-pane{flex:1;overflow-y:auto;padding:18px 15px;display:none;}
+.settings-pane.active{display:block;}
+.settings-title{font-size:21px;font-weight:700;margin-bottom:3px;}
+.settings-sub{font-size:12.5px;color:rgba(255,255,255,.35);line-height:1.5;margin-bottom:2px;}
+.key-section{margin-top:18px;}
+.key-label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.42);margin-bottom:6px;}
+.key-label .dot{width:7px;height:7px;border-radius:50%;}
+.key-input-wrap{position:relative;}
+.key-input{width:100%;padding:11px 38px 11px 13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);border-radius:var(--rsm);color:#fff;font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.key-input:focus{border-color:rgba(245,166,35,.5);}
+.key-input::placeholder{color:rgba(255,255,255,.2);}
+.key-status{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--openai);}
+.key-link{display:block;font-size:11px;color:rgba(255,255,255,.25);margin-top:4px;text-decoration:none;}
+.key-link:active{color:var(--claude);}
+.save-btn{width:100%;margin-top:24px;padding:13px;background:rgba(245,166,35,.18);border:1px solid rgba(245,166,35,.36);border-radius:var(--rsm);color:#fff;font-family:'Inter',sans-serif;font-weight:600;font-size:14.5px;cursor:pointer;transition:all .15s;}
+.save-btn:active{opacity:.8;}
+.save-confirm{text-align:center;margin-top:9px;font-size:12px;color:var(--openai);display:none;}
+
+/* IMAGE FULLSCREEN */
+.img-fullscreen{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;display:none;}
+.img-fullscreen.open{display:flex;}
+.img-fullscreen img{max-width:94%;max-height:88dvh;border-radius:14px;}
+.img-fullscreen-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* TOAST */
+.toast{position:fixed;bottom:105px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,20,30,.95);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:7px 17px;font-size:13px;font-weight:500;opacity:0;transition:all .22s;z-index:400;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="bg"><div class="bg-orb"></div><div class="bg-orb"></div><div class="bg-orb"></div></div>
+
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">AI<em>Hub</em></div>
+    <div class="header-actions">
+      <button class="icon-btn" id="historyBtn" title="History">🕐</button>
+      <button class="icon-btn" id="clearBtn" title="New chat">✏️</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar" id="tabsBar">
+    <div class="tab active" data-mode="select">Select</div>
+    <div class="tab" data-mode="all">Ask All</div>
+    <div class="tab" data-mode="judge">🏆 Judge</div>
+    <div class="tab" data-mode="imagine">✦ Imagine</div>
+  </div>
+
+  <!-- MODEL PILLS -->
+  <div class="model-pills" id="modelPills">
+    <!-- Claude pill -->
+    <div class="model-pill sel" data-model="claude">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" fill="#f5a623"/></svg>
+      Claude
+    </div>
+    <!-- OpenAI pill -->
+    <div class="model-pill" data-model="openai">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22.28 9.29a5.79 5.79 0 0 0-.5-4.76 5.9 5.9 0 0 0-6.34-2.83A5.9 5.9 0 0 0 11 0a5.9 5.9 0 0 0-5.63 4.1 5.9 5.9 0 0 0-3.94 2.86 5.9 5.9 0 0 0 .73 6.9 5.9 5.9 0 0 0 .5 4.76 5.9 5.9 0 0 0 6.34 2.83A5.9 5.9 0 0 0 13 24a5.9 5.9 0 0 0 5.63-4.1 5.9 5.9 0 0 0 3.94-2.86 5.9 5.9 0 0 0-.29-7.75zM13 22.4a4.37 4.37 0 0 1-2.81-1.02l.14-.08 4.67-2.7a.77.77 0 0 0 .39-.67v-6.6l1.97 1.14a.07.07 0 0 1 .04.06v5.46A4.38 4.38 0 0 1 13 22.4zm-9.38-4.02a4.37 4.37 0 0 1-.52-2.94l.14.08 4.67 2.7a.78.78 0 0 0 .78 0l5.7-3.3v2.28a.07.07 0 0 1-.03.06L9.6 20.05a4.38 4.38 0 0 1-5.98-1.67zm-1.22-10.2A4.37 4.37 0 0 1 4.67 5.6v5.5a.77.77 0 0 0 .39.67l5.7 3.3-1.97 1.14a.07.07 0 0 1-.07 0L4 13.5a4.38 4.38 0 0 1-1.6-5.32zM18.1 13.3l-5.7-3.3 1.97-1.14a.07.07 0 0 1 .07 0l4.73 2.73a4.37 4.37 0 0 1-.68 7.9V13.97a.77.77 0 0 0-.39-.67zm1.96-2.95l-.14-.08-4.67-2.7a.78.78 0 0 0-.78 0L8.77 10.87V8.59a.07.07 0 0 1 .03-.06l4.73-2.73a4.38 4.38 0 0 1 6.53 4.55zM7.88 12.84l-1.97-1.14a.07.07 0 0 1-.04-.06V6.18A4.38 4.38 0 0 1 13 1.6a4.37 4.37 0 0 1 2.81 1.02l-.14.08-4.67 2.7a.77.77 0 0 0-.39.67l-.01 6.59zm1.07-2.31 2.53-1.46 2.53 1.46v2.92l-2.53 1.46-2.53-1.46V10.53z" fill="#19c37d"/></svg>
+      ChatGPT
+    </div>
+    <!-- Gemini pill -->
+    <div class="model-pill" data-model="gemini">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 24A14.3 14.3 0 0 0 12 0a14.3 14.3 0 0 0 0 24z" fill="url(#gem)"/><defs><linearGradient id="gem" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4285f4"/><stop offset="50%" stop-color="#9b72cb"/><stop offset="100%" stop-color="#d96570"/></linearGradient></defs></svg>
+      Gemini
+    </div>
+    <!-- Grok pill -->
+    <div class="model-pill" data-model="grok">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill="#ccc"/></svg>
+      Grok
+    </div>
+  </div>
+
+  <!-- CHAT SCROLL (chat modes) -->
+  <div class="chat-scroll" id="chatScroll">
+    <div class="chat-pane active" id="pane-select">
+      <div class="empty-state" id="empty-select"><div class="empty-icon">✦</div><div class="empty-title">Choose your model</div><div class="empty-sub">Pick one or more above, then ask anything.</div></div>
+    </div>
+    <div class="chat-pane" id="pane-all">
+      <div class="empty-state" id="empty-all"><div class="empty-icon">◈</div><div class="empty-title">Ask all 4 at once</div><div class="empty-sub">Compare all models side by side.</div></div>
+    </div>
+    <div class="chat-pane" id="pane-judge">
+      <div class="judge-banner"><strong>Judge Mode</strong> — All 4 answer, Claude picks the best.</div>
+      <div class="empty-state" id="empty-judge"><div class="empty-icon">🏆</div><div class="empty-title">Let Claude decide</div><div class="empty-sub">All 4 compete. Claude crowns the winner.</div></div>
+    </div>
+  </div>
+
+  <!-- INPUT BAR (chat modes) -->
+  <div class="input-bar" id="inputBar">
+    <div id="attachPreview" style="display:none" class="attach-preview">
+      <img id="attachThumb" src="" alt="" style="display:none">
+      <span class="att-name" id="attachName"></span>
+      <button class="att-remove" id="attachRemove">✕</button>
+    </div>
+    <div class="input-row">
+      <button class="attach-btn" id="attachBtn">📎</button>
+      <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.md,.csv" style="display:none">
+      <div class="input-wrap">
+        <textarea id="msgInput" rows="1" placeholder="Ask anything…" maxlength="6000"></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn">↑</button>
+    </div>
+  </div>
+
+  <!-- IMAGINE PANE -->
+  <div class="imagine-pane" id="imagine-pane">
+    <!-- Image gen model selector -->
+    <div class="img-model-bar" id="imgModelBar">
+      <div class="img-model-pill sel" data-imgmodel="openai">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22.28 9.29a5.79 5.79 0 0 0-.5-4.76 5.9 5.9 0 0 0-6.34-2.83A5.9 5.9 0 0 0 11 0a5.9 5.9 0 0 0-5.63 4.1 5.9 5.9 0 0 0-3.94 2.86 5.9 5.9 0 0 0 .73 6.9 5.9 5.9 0 0 0 .5 4.76 5.9 5.9 0 0 0 6.34 2.83A5.9 5.9 0 0 0 13 24a5.9 5.9 0 0 0 5.63-4.1 5.9 5.9 0 0 0 3.94-2.86 5.9 5.9 0 0 0-.29-7.75zM13 22.4a4.37 4.37 0 0 1-2.81-1.02l.14-.08 4.67-2.7a.77.77 0 0 0 .39-.67v-6.6l1.97 1.14a.07.07 0 0 1 .04.06v5.46A4.38 4.38 0 0 1 13 22.4zm-9.38-4.02a4.37 4.37 0 0 1-.52-2.94l.14.08 4.67 2.7a.78.78 0 0 0 .78 0l5.7-3.3v2.28a.07.07 0 0 1-.03.06L9.6 20.05a4.38 4.38 0 0 1-5.98-1.67zm-1.22-10.2A4.37 4.37 0 0 1 4.67 5.6v5.5a.77.77 0 0 0 .39.67l5.7 3.3-1.97 1.14a.07.07 0 0 1-.07 0L4 13.5a4.38 4.38 0 0 1-1.6-5.32zM18.1 13.3l-5.7-3.3 1.97-1.14a.07.07 0 0 1 .07 0l4.73 2.73a4.37 4.37 0 0 1-.68 7.9V13.97a.77.77 0 0 0-.39-.67zm1.96-2.95l-.14-.08-4.67-2.7a.78.78 0 0 0-.78 0L8.77 10.87V8.59a.07.07 0 0 1 .03-.06l4.73-2.73a4.38 4.38 0 0 1 6.53 4.55zM7.88 12.84l-1.97-1.14a.07.07 0 0 1-.04-.06V6.18A4.38 4.38 0 0 1 13 1.6a4.37 4.37 0 0 1 2.81 1.02l-.14.08-4.67 2.7a.77.77 0 0 0-.39.67l-.01 6.59zm1.07-2.31 2.53-1.46 2.53 1.46v2.92l-2.53 1.46-2.53-1.46V10.53z" fill="#19c37d"/></svg>
+        DALL·E 3
+      </div>
+      <div class="img-model-pill" data-imgmodel="gemini">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 24A14.3 14.3 0 0 0 12 0a14.3 14.3 0 0 0 0 24z" fill="url(#gem2)"/><defs><linearGradient id="gem2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4285f4"/><stop offset="50%" stop-color="#9b72cb"/><stop offset="100%" stop-color="#d96570"/></linearGradient></defs></svg>
+        Imagen 3
+      </div>
+      <div class="img-model-pill" data-imgmodel="grok">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill="#ccc"/></svg>
+        Aurora
+      </div>
+      <div class="img-model-pill" data-imgmodel="all">✦ All 3</div>
+    </div>
+    <div class="imagine-scroll" id="imagineScroll">
+      <div class="imagine-empty" id="imagineEmpty">
+        <div class="empty-icon">🎨</div>
+        <div class="empty-title">Generate images</div>
+        <div class="empty-sub">Pick a generator above, describe what you want to see.</div>
+      </div>
+      <div class="img-grid" id="imgGrid"></div>
+    </div>
+    <div class="imagine-input-bar">
+      <div class="imagine-row">
+        <div class="imagine-input input-wrap">
+          <textarea id="imagineInput" rows="1" placeholder="Describe an image…" maxlength="1000"></textarea>
+        </div>
+        <button class="imagine-btn" id="imagineBtn">✦</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS PANE -->
+  <div class="settings-pane" id="settingsPane">
+    <div class="settings-title">API Keys</div>
+    <div class="settings-sub">Saved only on your device.</div>
+    <div class="key-section">
+      <div class="key-label"><div class="dot" style="background:var(--claude)"></div>Anthropic (Claude)</div>
+      <div class="key-input-wrap"><input class="key-input" id="key-claude" type="password" placeholder="sk-ant-…" autocomplete="off"><div class="key-status" id="status-claude"></div></div>
+      <a class="key-link" href="https://console.anthropic.com" target="_blank">→ console.anthropic.com</a>
+    </div>
+    <div class="key-section">
+      <div class="key-label"><div class="dot" style="background:var(--openai)"></div>OpenAI (ChatGPT + DALL·E)</div>
+      <div class="key-input-wrap"><input class="key-input" id="key-openai" type="password" placeholder="sk-…" autocomplete="off"><div class="key-status" id="status-openai"></div></div>
+      <a class="key-link" href="https://platform.openai.com/api-keys" target="_blank">→ platform.openai.com</a>
+    </div>
+    <div class="key-section">
+      <div class="key-label"><div class="dot" style="background:var(--gemini)"></div>Google (Gemini)</div>
+      <div class="key-input-wrap"><input class="key-input" id="key-gemini" type="password" placeholder="AIza…" autocomplete="off"><div class="key-status" id="status-gemini"></div></div>
+      <a class="key-link" href="https://aistudio.google.com/app/apikey" target="_blank">→ aistudio.google.com</a>
+    </div>
+    <div class="key-section">
+      <div class="key-label"><div class="dot" style="background:var(--grok)"></div>xAI (Grok)</div>
+      <div class="key-input-wrap"><input class="key-input" id="key-grok" type="password" placeholder="xai-…" autocomplete="off"><div class="key-status" id="status-grok"></div></div>
+      <a class="key-link" href="https://console.x.ai" target="_blank">→ console.x.ai</a>
+    </div>
+    <button class="save-btn" id="saveBtn">Save Keys</button>
+    <div class="save-confirm" id="saveConfirm">✓ Keys saved</div>
+  </div>
+</div>
+
+<!-- HISTORY SIDEBAR -->
+<div class="history-overlay" id="historyOverlay">
+  <div class="history-panel">
+    <div class="history-head">
+      <h2>Chat History</h2>
+      <button class="history-close" id="historyClose">✕</button>
+    </div>
+    <div class="history-tabs">
+      <div class="h-tab active" data-hmode="select">Select</div>
+      <div class="h-tab" data-hmode="all">Ask All</div>
+      <div class="h-tab" data-hmode="judge">Judge</div>
+    </div>
+    <div class="new-chat-btn" id="newChatBtn">+ New Chat</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<!-- IMAGE FULLSCREEN -->
+<div class="img-fullscreen" id="imgFullscreen">
+  <button class="img-fullscreen-close" id="imgFullscreenClose">✕</button>
+  <img id="imgFullscreenImg" src="" alt="">
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let mode = 'select';
+let selectedModels = new Set(['claude']);
+let isLoading = false;
+let keys = {};
+let historyMode = 'select';
+
+// Sessions: { select: [{id, title, ts, messages:[{userText, attachName, attachData, attachType, responses, winner}]}], all:[], judge:[], imagine:[] }
+let sessions = { select:[], all:[], judge:[], imagine:[] };
+let currentSession = { select: null, all: null, judge: null };
+
+// Current attachment
+let attachData = null; // base64
+let attachType = null; // mime type
+let attachName = null;
+let attachIsImage = false;
+
+const MODELS = {
+  claude:{label:'Claude',cls:'claude'},
+  openai:{label:'ChatGPT',cls:'openai'},
+  gemini:{label:'Gemini',cls:'gemini'},
+  grok:{label:'Grok',cls:'grok'},
+};
+
+// ── PERSIST ──
+function saveAll() {
+  try { localStorage.setItem('aihub_keys', JSON.stringify(keys)); } catch(e){}
+  try { localStorage.setItem('aihub_sessions', JSON.stringify(sessions)); } catch(e){}
+}
+function loadAll() {
+  try { const k = localStorage.getItem('aihub_keys'); if(k) keys = JSON.parse(k); } catch(e){}
+  try { const s = localStorage.getItem('aihub_sessions'); if(s) { const p=JSON.parse(s); if(p.select) sessions=p; } } catch(e){}
+  ['claude','openai','gemini','grok'].forEach(m => {
+    const el=document.getElementById('key-'+m);
+    if(el&&keys[m]){el.value=keys[m];document.getElementById('status-'+m).textContent='✓';}
+  });
+  // Load most recent session per mode into pane
+  ['select','all','judge'].forEach(m => {
+    if(sessions[m]?.length) {
+      const s = sessions[m][sessions[m].length-1];
+      currentSession[m] = s.id;
+      s.messages.forEach(msg => renderMsg(msg, m));
+      if(s.messages.length) document.getElementById('empty-'+m).style.display='none';
+    }
+  });
+  // Load image gen history
+  if(sessions.imagine?.length) {
+    document.getElementById('imagineEmpty').style.display='none';
+    sessions.imagine.forEach(item => {
+      const group=document.createElement('div'); group.className='img-result-group';
+      const card=document.createElement('div'); card.className='img-card';
+      card.innerHTML=`<img src="${item.url}" alt="${escHtml(item.prompt)}" loading="lazy"><div class="img-caption">${escHtml(item.prompt)}</div>`;
+      card.addEventListener('click',()=>openFullscreen(item.url));
+      group.appendChild(card);
+      document.getElementById('imagineScroll').appendChild(group);
+    });
+  }
+}
+
+function getOrCreateSession(m) {
+  if(currentSession[m]) return sessions[m].find(s=>s.id===currentSession[m]);
+  return newSession(m);
+}
+function newSession(m) {
+  const s = { id: Date.now()+'_'+Math.random().toString(36).slice(2), title:'New Chat', ts: Date.now(), messages:[] };
+  sessions[m].push(s);
+  currentSession[m] = s.id;
+  saveAll();
+  return s;
+}
+
+// ── TABS ──
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if(isLoading) return;
+    const prev = mode;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    mode = tab.dataset.mode;
+
+    // Show/hide panels
+    const isChat = mode !== 'imagine';
+    document.getElementById('chatScroll').style.display = isChat ? '' : 'none';
+    document.getElementById('inputBar').style.display = isChat ? '' : 'none';
+    document.getElementById('imagine-pane').classList.toggle('active', mode==='imagine');
+    document.getElementById('modelPills').style.display = mode==='select' ? 'flex' : 'none';
+
+    if(isChat) {
+      document.querySelectorAll('.chat-pane').forEach(p=>p.classList.remove('active'));
+      document.getElementById('pane-'+mode).classList.add('active');
+      scrollBottom();
+    }
+  });
+});
+
+// ── MODEL PILLS ──
+document.querySelectorAll('.model-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    const m=pill.dataset.model;
+    if(selectedModels.has(m)){if(selectedModels.size===1)return;selectedModels.delete(m);pill.classList.remove('sel');}
+    else{selectedModels.add(m);pill.classList.add('sel');}
+  });
+});
+
+// ── SETTINGS ──
+let inSettings = false;
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  inSettings=!inSettings;
+  const isChat = mode !== 'imagine';
+  document.getElementById('chatScroll').style.display = inSettings ? 'none' : (isChat ? '' : 'none');
+  document.getElementById('inputBar').style.display = inSettings ? 'none' : (isChat ? '' : 'none');
+  document.getElementById('imagine-pane').classList.toggle('active', !inSettings && mode==='imagine');
+  document.getElementById('tabsBar').style.display = inSettings ? 'none' : '';
+  document.getElementById('modelPills').style.display = inSettings ? 'none' : (mode==='select' ? 'flex' : 'none');
+  document.getElementById('settingsPane').classList.toggle('active', inSettings);
+  document.getElementById('settingsBtn').textContent = inSettings ? '💬' : '⚙️';
+});
+document.getElementById('saveBtn').addEventListener('click', () => {
+  ['claude','openai','gemini','grok'].forEach(m => {
+    const val=document.getElementById('key-'+m)?.value.trim();
+    if(val){keys[m]=val;document.getElementById('status-'+m).textContent='✓';}
+    else{delete keys[m];document.getElementById('status-'+m).textContent='';}
+  });
+  saveAll();
+  const c=document.getElementById('saveConfirm'); c.style.display='block'; setTimeout(()=>c.style.display='none',2500);
+});
+
+// ── CLEAR / NEW CHAT ──
+document.getElementById('clearBtn').addEventListener('click', () => startNewChat(mode));
+function startNewChat(m) {
+  if(!['select','all','judge'].includes(m)) return;
+  currentSession[m] = null;
+  const pane = document.getElementById('pane-'+m);
+  pane.querySelectorAll('.message-group').forEach(el=>el.remove());
+  document.getElementById('empty-'+m).style.display='';
+  showToast('New chat started');
+}
+
+// ── FILE ATTACH ──
+document.getElementById('attachBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if(!file) return;
+  attachName = file.name; attachType = file.type;
+  attachIsImage = file.type.startsWith('image/');
+  attachData = await toBase64(file);
+  document.getElementById('attachName').textContent = file.name;
+  document.getElementById('attachPreview').style.display='flex';
+  if(attachIsImage) {
+    const thumb = document.getElementById('attachThumb');
+    thumb.src='data:'+file.type+';base64,'+attachData; thumb.style.display='block';
+  }
+  e.target.value='';
+});
+document.getElementById('attachRemove').addEventListener('click', clearAttach);
+function clearAttach() { attachData=null; attachType=null; attachName=null; attachIsImage=false; document.getElementById('attachPreview').style.display='none'; document.getElementById('attachThumb').src=''; document.getElementById('fileInput').value=''; }
+function toBase64(file) {
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+}
+
+// ── INPUT ──
+const msgInput = document.getElementById('msgInput');
+msgInput.addEventListener('input',()=>{msgInput.style.height='auto';msgInput.style.height=Math.min(msgInput.scrollHeight,110)+'px';});
+msgInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}});
+document.getElementById('sendBtn').addEventListener('click', handleSend);
+
+// ── SEND ──
+async function handleSend() {
+  const text = msgInput.value.trim();
+  if((!text && !attachData) || isLoading) return;
+
+  const session = getOrCreateSession(mode);
+  document.getElementById('empty-'+mode).style.display='none';
+  msgInput.value=''; msgInput.style.height='auto';
+  isLoading=true; document.getElementById('sendBtn').disabled=true;
+
+  const curAttachData=attachData, curAttachType=attachType, curAttachName=attachName, curIsImg=attachIsImage;
+  clearAttach();
+
+  const targets = mode==='select' ? [...selectedModels] : ['claude','openai','gemini','grok'];
+
+  // Render user message
+  const group=document.createElement('div'); group.className='message-group';
+  let userInner=`<div class="user-bubble">${escHtml(text||'')}`;
+  if(curIsImg) userInner+=`<img src="data:${curAttachType};base64,${curAttachData}" alt="">`;
+  if(curAttachName&&!curIsImg) userInner+=`<div class="attach-name">📄 ${escHtml(curAttachName)}</div>`;
+  userInner+='</div>';
+  group.innerHTML=`<div class="user-msg">${userInner}</div>`;
+
+  const grid=document.createElement('div'); grid.className='responses-grid';
+  const cards={};
+  targets.forEach(m=>{cards[m]=makeCard(m);grid.appendChild(cards[m]);});
+  group.appendChild(grid);
+  document.getElementById('pane-'+mode).appendChild(group);
+  scrollBottom();
+
+  const results=await Promise.allSettled(targets.map(m=>fetchModel(m,text,curAttachData,curAttachType,curIsImg)));
+  const responses={};
+  targets.forEach((m,i)=>{
+    const r=results[i];
+    const txt=r.status==='fulfilled'?r.value:('Error: '+(r.reason?.message||'Failed'));
+    responses[m]=txt; fillCard(cards[m],m,txt,r.status==='rejected');
+  });
+
+  let winner=null;
+  if(mode==='judge'){
+    const jc=makeCard('judge'); grid.appendChild(jc); scrollBottom();
+    const jr=await runJudge(text,responses);
+    fillCard(jc,'judge',jr,false); responses['judge']=jr;
+    const wm=jr.match(/WINNER:\s*(claude|openai|gemini|grok)/i);
+    if(wm){winner=wm[1].toLowerCase();cards[winner]?.classList.add('winner');const hdr=cards[winner]?.querySelector('.response-header');if(hdr){const b=document.createElement('div');b.className='winner-badge';b.textContent='🏆 Best';hdr.appendChild(b);}}
+  }
+
+  // Save to session
+  const msgEntry={userText:text,attachName:curAttachName,attachData:curIsImg?curAttachData:null,attachType:curIsImg?curAttachType:null,responses,winner};
+  session.messages.push(msgEntry);
+  if(session.messages.length===1) session.title = (text||curAttachName||'Untitled').slice(0,40);
+  session.ts=Date.now();
+  saveAll();
+
+  isLoading=false; document.getElementById('sendBtn').disabled=false; scrollBottom();
+}
+
+// ── RENDER SAVED MSG ──
+function renderMsg(msg, m) {
+  const group=document.createElement('div'); group.className='message-group';
+  let userInner=`<div class="user-bubble">${escHtml(msg.userText||'')}`;
+  if(msg.attachData) userInner+=`<img src="data:${msg.attachType};base64,${msg.attachData}" alt="">`;
+  else if(msg.attachName) userInner+=`<div class="attach-name">📄 ${escHtml(msg.attachName)}</div>`;
+  userInner+='</div>';
+  group.innerHTML=`<div class="user-msg">${userInner}</div>`;
+  const grid=document.createElement('div'); grid.className='responses-grid';
+  Object.entries(msg.responses).forEach(([model,text])=>{
+    const isErr=text.startsWith('Error:');
+    const info=model==='judge'?{label:'🏆 Claude Judge',cls:'judge'}:MODELS[model];
+    const card=document.createElement('div');
+    card.className=`response-card ${info.cls}-card${msg.winner===model?' winner':''}`;
+    card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div>${msg.winner===model?'<div class="winner-badge">🏆 Best</div>':''}</div><div class="${isErr?'error-text':'response-body'}">${escHtml(text)}</div>`;
+    grid.appendChild(card);
+  });
+  group.appendChild(grid);
+  document.getElementById('pane-'+m).appendChild(group);
+}
+
+// ── CARD HELPERS ──
+function makeCard(model){const info=model==='judge'?{label:'🏆 Claude Judge',cls:'judge'}:MODELS[model];const card=document.createElement('div');card.className=`response-card ${info.cls}-card`;card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div></div><div class="loading-dots"><span></span><span></span><span></span></div>`;return card;}
+function fillCard(card,model,text,isError){card.querySelector('.loading-dots')?.remove();const body=document.createElement('div');body.className=isError?'error-text':'response-body';body.textContent=text;card.appendChild(body);}
+
+// ── API CALLS ──
+async function fetchModel(model,prompt,imgData,imgType,isImg){
+  switch(model){
+    case 'claude': return fetchClaude(prompt,imgData,imgType,isImg);
+    case 'openai': return fetchOpenAI(prompt,imgData,imgType,isImg);
+    case 'gemini': return fetchGemini(prompt,imgData,imgType,isImg);
+    case 'grok':   return fetchGrok(prompt,imgData,imgType,isImg);
+  }
+}
+async function fetchClaude(prompt,imgData,imgType,isImg){
+  const key=keys['claude']; if(!key) throw new Error('No Claude key. Add in ⚙️');
+  let content=[];
+  if(isImg&&imgData) content.push({type:'image',source:{type:'base64',media_type:imgType,data:imgData}});
+  if(prompt) content.push({type:'text',text:prompt});
+  if(!content.length) content=[{type:'text',text:'Describe what you see.'}];
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1024,messages:[{role:'user',content}]})});
+  const d=await res.json(); if(!res.ok) throw new Error(d.error?.message||'Claude error');
+  return d.content[0].text;
+}
+async function fetchOpenAI(prompt,imgData,imgType,isImg){
+  const key=keys['openai']; if(!key) throw new Error('No OpenAI key. Add in ⚙️');
+  let content=[];
+  if(isImg&&imgData) content.push({type:'image_url',image_url:{url:`data:${imgType};base64,${imgData}`}});
+  if(prompt) content.push({type:'text',text:prompt});
+  if(!content.length) content=[{type:'text',text:'Describe this image.'}];
+  const model = isImg ? 'gpt-4o' : 'gpt-4o';
+  const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:1024,messages:[{role:'user',content}]})});
+  const d=await res.json(); if(!res.ok) throw new Error(d.error?.message||'OpenAI error');
+  return d.choices[0].message.content;
+}
+async function fetchGemini(prompt,imgData,imgType,isImg){
+  const key=keys['gemini']; if(!key) throw new Error('No Gemini key. Add in ⚙️');
+  let parts=[];
+  if(isImg&&imgData) parts.push({inline_data:{mime_type:imgType,data:imgData}});
+  if(prompt) parts.push({text:prompt});
+  if(!parts.length) parts=[{text:'Describe this image.'}];
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts}]})});
+  const d=await res.json(); if(!res.ok) throw new Error(JSON.stringify(d?.error||d));
+  return d.candidates[0].content.parts[0].text;
+}
+async function fetchGrok(prompt,imgData,imgType,isImg){
+  const key=keys['grok']; if(!key) throw new Error('No Grok key. Add in ⚙️');
+  let content=[];
+  if(isImg&&imgData) content.push({type:'image_url',image_url:{url:`data:${imgType};base64,${imgData}`}});
+  if(prompt) content.push({type:'text',text:prompt});
+  if(!content.length) content=[{type:'text',text:'Describe this image.'}];
+  const res=await fetch('https://api.x.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'grok-3',max_tokens:1024,messages:[{role:'user',content}]})});
+  const d=await res.json(); if(!res.ok) throw new Error(JSON.stringify(d?.error||d));
+  return d.choices[0].message.content;
+}
+async function runJudge(question,responses){
+  const key=keys['claude']; if(!key) return 'No Claude key. Add in ⚙️';
+  const modelList=Object.entries(responses).map(([m,r])=>`## ${MODELS[m].label}\n${r}`).join('\n\n---\n\n');
+  const prompt=`You are an impartial judge. The user asked:\n\n"${question}"\n\nResponses:\n\n${modelList}\n\n---\n\n1. Brief eval of each (1-2 sentences)\n2. WINNER: [exactly one of: claude, openai, gemini, grok]\n3. One sentence why.`;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1024,messages:[{role:'user',content:prompt}]})});
+  const d=await res.json(); if(!res.ok) return 'Judge error: '+(d.error?.message||'Unknown');
+  return d.content[0].text;
+}
+
+// ── IMAGE GENERATION ──
+let imgModel = 'openai';
+document.querySelectorAll('.img-model-pill').forEach(pill=>{
+  pill.addEventListener('click',()=>{
+    document.querySelectorAll('.img-model-pill').forEach(p=>p.classList.remove('sel'));
+    pill.classList.add('sel'); imgModel=pill.dataset.imgmodel;
+  });
+});
+
+const imagineInput = document.getElementById('imagineInput');
+imagineInput.addEventListener('input',()=>{imagineInput.style.height='auto';imagineInput.style.height=Math.min(imagineInput.scrollHeight,110)+'px';});
+imagineInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleImagine();}});
+document.getElementById('imagineBtn').addEventListener('click', handleImagine);
+
+async function handleImagine(){
+  const prompt=imagineInput.value.trim(); if(!prompt||isLoading) return;
+  imagineInput.value=''; imagineInput.style.height='auto';
+  isLoading=true; document.getElementById('imagineBtn').disabled=true;
+  document.getElementById('imagineEmpty').style.display='none';
+
+  const targets = imgModel==='all' ? ['openai','gemini','grok'] : [imgModel];
+
+  // Show prompt bubble
+  const scroll = document.getElementById('imagineScroll');
+  const promptBubble = document.createElement('div');
+  promptBubble.className='img-prompt-bubble'; promptBubble.textContent=prompt;
+  scroll.appendChild(promptBubble);
+  scroll.scrollTop=scroll.scrollHeight;
+
+  // Generate from all selected generators in parallel
+  const results = await Promise.allSettled(targets.map(t=>generateImage(t,prompt)));
+
+  targets.forEach((t,i)=>{
+    const r=results[i];
+    if(r.status==='fulfilled'&&r.value){
+      const group=document.createElement('div'); group.className='img-result-group';
+      if(imgModel==='all'){
+        const lbl=document.createElement('div');
+        lbl.className=`img-result-label ${t}`;
+        lbl.textContent={openai:'DALL·E 3',gemini:'Imagen 3',grok:'Aurora'}[t];
+        group.appendChild(lbl);
+      }
+      const card=document.createElement('div'); card.className='img-card';
+      card.innerHTML=`<img src="${r.value}" alt="${escHtml(prompt)}" loading="lazy"><div class="img-caption">${escHtml(prompt)}</div>`;
+      card.addEventListener('click',()=>openFullscreen(r.value));
+      group.appendChild(card);
+      scroll.appendChild(group);
+      if(!sessions.imagine) sessions.imagine=[];
+      sessions.imagine.push({prompt,url:r.value,model:t,ts:Date.now()});
+      saveAll();
+    } else {
+      const err=document.createElement('div'); err.className='img-err';
+      err.textContent=`${({openai:'DALL·E 3',gemini:'Imagen 3',grok:'Aurora'}[t])}: ${r.reason?.message||'Failed'}`;
+      scroll.appendChild(err);
+    }
+  });
+
+  scroll.scrollTop=scroll.scrollHeight;
+  isLoading=false; document.getElementById('imagineBtn').disabled=false;
+}
+
+async function generateImage(model, prompt){
+  switch(model){
+    case 'openai': return genDalle(prompt);
+    case 'gemini': return genImagen(prompt);
+    case 'grok':   return genAurora(prompt);
+  }
+}
+
+async function genDalle(prompt){
+  const key=keys['openai']; if(!key) throw new Error('No OpenAI key. Add in ⚙️');
+  const res=await fetch('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'dall-e-3',prompt,n:1,size:'1024x1024',response_format:'url'})});
+  const d=await res.json(); if(!res.ok) throw new Error(d.error?.message||'DALL·E error');
+  return d.data[0].url;
+}
+
+async function genImagen(prompt){
+  const key=keys['gemini']; if(!key) throw new Error('No Gemini key. Add in ⚙️');
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instances:[{prompt}],parameters:{sampleCount:1,aspectRatio:'1:1'}})});
+  const d=await res.json(); if(!res.ok) throw new Error(d.error?.message||'Imagen error');
+  const b64=d.predictions?.[0]?.bytesBase64Encoded; if(!b64) throw new Error('No image returned');
+  return 'data:image/png;base64,'+b64;
+}
+
+async function genAurora(prompt){
+  const key=keys['grok']; if(!key) throw new Error('No Grok key. Add in ⚙️');
+  const res=await fetch('https://api.x.ai/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'aurora',prompt,n:1,response_format:'url'})});
+  const d=await res.json(); if(!res.ok) throw new Error(JSON.stringify(d?.error||d));
+  return d.data[0].url;
+}
+function openFullscreen(url){document.getElementById('imgFullscreenImg').src=url;document.getElementById('imgFullscreen').classList.add('open');}
+document.getElementById('imgFullscreenClose').addEventListener('click',()=>document.getElementById('imgFullscreen').classList.remove('open'));
+document.getElementById('imgFullscreen').addEventListener('click',e=>{if(e.target===document.getElementById('imgFullscreen'))document.getElementById('imgFullscreen').classList.remove('open');});
+
+// ── HISTORY SIDEBAR ──
+document.getElementById('historyBtn').addEventListener('click',()=>{renderHistoryList();document.getElementById('historyOverlay').classList.add('open');});
+document.getElementById('historyClose').addEventListener('click',()=>document.getElementById('historyOverlay').classList.remove('open'));
+document.getElementById('historyOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('historyOverlay'))document.getElementById('historyOverlay').classList.remove('open');});
+document.querySelectorAll('.h-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.h-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active'); historyMode=tab.dataset.hmode; renderHistoryList();
+  });
+});
+document.getElementById('newChatBtn').addEventListener('click',()=>{
+  document.getElementById('historyOverlay').classList.remove('open');
+  // Switch to that mode and start new chat
+  const tabEl=document.querySelector(`.tab[data-mode="${historyMode}"]`);
+  if(tabEl) tabEl.click();
+  setTimeout(()=>startNewChat(historyMode),50);
+});
+
+function renderHistoryList(){
+  const list=document.getElementById('historyList');
+  list.innerHTML='';
+  const s=sessions[historyMode]||[];
+  if(!s.length){list.innerHTML='<div class="h-empty">No conversations yet</div>';return;}
+  [...s].reverse().forEach(session=>{
+    const item=document.createElement('div'); item.className='h-session';
+    const ts=new Date(session.ts).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    item.innerHTML=`<button class="h-session-del" data-id="${session.id}">✕</button><div class="h-session-title">${escHtml(session.title||'Untitled')}</div><div class="h-session-meta"><span>${ts}</span><span>${session.messages.length} msg${session.messages.length!==1?'s':''}</span></div>`;
+    item.addEventListener('click',e=>{if(e.target.closest('.h-session-del'))return;loadSession(session.id,historyMode);});
+    item.querySelector('.h-session-del').addEventListener('click',e=>{e.stopPropagation();deleteSession(session.id,historyMode);renderHistoryList();});
+    list.appendChild(item);
+  });
+}
+function loadSession(id, m){
+  document.getElementById('historyOverlay').classList.remove('open');
+  const session=sessions[m]?.find(s=>s.id===id); if(!session) return;
+  // Switch tab
+  const tabEl=document.querySelector(`.tab[data-mode="${m}"]`);
+  if(tabEl) tabEl.click();
+  setTimeout(()=>{
+    currentSession[m]=id;
+    const pane=document.getElementById('pane-'+m);
+    pane.querySelectorAll('.message-group').forEach(el=>el.remove());
+    document.getElementById('empty-'+m).style.display = session.messages.length ? 'none' : '';
+    session.messages.forEach(msg=>renderMsg(msg,m));
+    scrollBottom();
+  },60);
+}
+function deleteSession(id,m){
+  sessions[m]=sessions[m].filter(s=>s.id!==id);
+  if(currentSession[m]===id) currentSession[m]=null;
+  saveAll();
+}
+
+// ── UTILS ──
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function scrollBottom(){const s=document.getElementById('chatScroll');if(s)s.scrollTop=s.scrollHeight;}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ── INIT ──
+loadAll();
+</script>
+</body>
+</html>
