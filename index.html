@@ -215,6 +215,15 @@ textarea::placeholder{color:rgba(255,255,255,.27);}
 .img-fullscreen img{max-width:94%;max-height:88dvh;border-radius:14px;}
 .img-fullscreen-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 
+/* JUDGE SILENT MODE */
+.judge-thinking{display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(191,127,255,.07);border:1px solid rgba(191,127,255,.18);border-radius:var(--r);color:rgba(255,255,255,.45);font-size:13px;}
+.judge-thinking-label{font-size:13px;color:rgba(255,255,255,.4);}
+.judge-result{display:flex;flex-direction:column;gap:10px;width:100%;}
+.see-others-btn{background:none;border:1px solid rgba(255,255,255,.13);border-radius:20px;color:rgba(255,255,255,.38);font-size:12px;font-weight:500;padding:7px 14px;cursor:pointer;transition:all .2s;align-self:flex-start;font-family:'Inter',sans-serif;}
+.see-others-btn:active{border-color:rgba(255,255,255,.28);color:rgba(255,255,255,.7);}
+.other-answers{display:none;flex-direction:column;gap:9px;}
+.other-answers.open{display:flex;}
+
 /* TOAST */
 .toast{position:fixed;bottom:105px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,20,30,.95);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:7px 17px;font-size:13px;font-weight:500;opacity:0;transition:all .22s;z-index:400;white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -555,28 +564,45 @@ async function handleSend() {
   userInner+='</div>';
   group.innerHTML=`<div class="user-msg">${userInner}</div>`;
 
-  const grid=document.createElement('div'); grid.className='responses-grid';
-  const cards={};
-  targets.forEach(m=>{cards[m]=makeCard(m);grid.appendChild(cards[m]);});
-  group.appendChild(grid);
   document.getElementById('pane-'+mode).appendChild(group);
-  scrollBottom();
 
-  const results=await Promise.allSettled(targets.map(m=>fetchModel(m,text,curAttachData,curAttachType,curIsImg)));
   const responses={};
-  targets.forEach((m,i)=>{
-    const r=results[i];
-    const txt=r.status==='fulfilled'?r.value:('Error: '+(r.reason?.message||'Failed'));
-    responses[m]=txt; fillCard(cards[m],m,txt,r.status==='rejected');
-  });
-
   let winner=null;
+
   if(mode==='judge'){
-    const jc=makeCard('judge'); grid.appendChild(jc); scrollBottom();
+    // Silent mode: all 4 think in background, then judge decides
+    const thinkingEl=document.createElement('div'); thinkingEl.className='judge-thinking';
+    thinkingEl.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div><span class="judge-thinking-label">Models are thinking…</span>';
+    group.appendChild(thinkingEl); scrollBottom();
+
+    const allModels=['claude','openai','gemini','grok'];
+    const results=await Promise.allSettled(allModels.map(m=>fetchModel(m,text,curAttachData,curAttachType,curIsImg)));
+    allModels.forEach((m,i)=>{
+      const r=results[i];
+      responses[m]=r.status==='fulfilled'?r.value:('Error: '+(r.reason?.message||'Failed'));
+    });
+
+    thinkingEl.querySelector('.judge-thinking-label').textContent='Judge is evaluating…';
     const jr=await runJudge(text,responses);
-    fillCard(jc,'judge',jr,false); responses['judge']=jr;
+    responses['judge']=jr;
     const wm=jr.match(/WINNER:\s*(claude|openai|gemini|grok)/i);
-    if(wm){winner=wm[1].toLowerCase();cards[winner]?.classList.add('winner');const hdr=cards[winner]?.querySelector('.response-header');if(hdr){const b=document.createElement('div');b.className='winner-badge';b.textContent='🏆 Best';hdr.appendChild(b);}}
+    winner=wm?wm[1].toLowerCase():null;
+
+    thinkingEl.remove();
+    group.appendChild(buildJudgeResult(responses,winner));
+    scrollBottom();
+  } else {
+    const grid=document.createElement('div'); grid.className='responses-grid';
+    const cards={};
+    targets.forEach(m=>{cards[m]=makeCard(m);grid.appendChild(cards[m]);});
+    group.appendChild(grid); scrollBottom();
+
+    const results=await Promise.allSettled(targets.map(m=>fetchModel(m,text,curAttachData,curAttachType,curIsImg)));
+    targets.forEach((m,i)=>{
+      const r=results[i];
+      const txt=r.status==='fulfilled'?r.value:('Error: '+(r.reason?.message||'Failed'));
+      responses[m]=txt; fillCard(cards[m],m,txt,r.status==='rejected');
+    });
   }
 
   // Save to session
@@ -597,22 +623,76 @@ function renderMsg(msg, m) {
   else if(msg.attachName) userInner+=`<div class="attach-name">📄 ${escHtml(msg.attachName)}</div>`;
   userInner+='</div>';
   group.innerHTML=`<div class="user-msg">${userInner}</div>`;
-  const grid=document.createElement('div'); grid.className='responses-grid';
-  Object.entries(msg.responses).forEach(([model,text])=>{
-    const isErr=text.startsWith('Error:');
-    const info=model==='judge'?{label:'🏆 Claude Judge',cls:'judge'}:MODELS[model];
-    const card=document.createElement('div');
-    card.className=`response-card ${info.cls}-card${msg.winner===model?' winner':''}`;
-    card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div>${msg.winner===model?'<div class="winner-badge">🏆 Best</div>':''}</div><div class="${isErr?'error-text':'response-body'}">${escHtml(text)}</div>`;
-    grid.appendChild(card);
-  });
-  group.appendChild(grid);
+  if(m==='judge'){
+    group.appendChild(buildJudgeResult(msg.responses,msg.winner));
+  } else {
+    const grid=document.createElement('div'); grid.className='responses-grid';
+    Object.entries(msg.responses).forEach(([model,text])=>{
+      const isErr=text.startsWith('Error:');
+      const info=MODELS[model];
+      if(!info) return;
+      const card=document.createElement('div');
+      card.className=`response-card ${info.cls}-card${msg.winner===model?' winner':''}`;
+      card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div>${msg.winner===model?'<div class="winner-badge">🏆 Best</div>':''}</div><div class="${isErr?'error-text':'response-body'}">${escHtml(text)}</div>`;
+      grid.appendChild(card);
+    });
+    group.appendChild(grid);
+  }
   document.getElementById('pane-'+m).appendChild(group);
 }
 
 // ── CARD HELPERS ──
 function makeCard(model){const info=model==='judge'?{label:'🏆 Claude Judge',cls:'judge'}:MODELS[model];const card=document.createElement('div');card.className=`response-card ${info.cls}-card`;card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div></div><div class="loading-dots"><span></span><span></span><span></span></div>`;return card;}
 function fillCard(card,model,text,isError){card.querySelector('.loading-dots')?.remove();const body=document.createElement('div');body.className=isError?'error-text':'response-body';body.textContent=text;card.appendChild(body);}
+
+function buildJudgeResult(responses,winner){
+  const container=document.createElement('div'); container.className='judge-result';
+
+  // Winner card shown prominently
+  if(winner&&responses[winner]){
+    const info=MODELS[winner];
+    const card=document.createElement('div');
+    card.className=`response-card ${info.cls}-card winner`;
+    card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div><div class="winner-badge">🏆 Best Answer</div></div><div class="response-body">${escHtml(responses[winner])}</div>`;
+    container.appendChild(card);
+  }
+
+  // Count other items for button label
+  const otherModels=['claude','openai','gemini','grok'].filter(m=>m!==winner&&responses[m]);
+  const othersCount=otherModels.length+(responses['judge']?1:0);
+
+  const toggleBtn=document.createElement('button'); toggleBtn.className='see-others-btn';
+  toggleBtn.textContent=`See other answers (${othersCount}) ▾`;
+  container.appendChild(toggleBtn);
+
+  // Collapsible: judge analysis + losing model cards
+  const othersEl=document.createElement('div'); othersEl.className='other-answers';
+
+  if(responses['judge']){
+    const jcard=document.createElement('div'); jcard.className='response-card judge-card';
+    jcard.innerHTML=`<div class="response-header"><div class="response-model judge">⚖️ Judge Analysis</div></div><div class="response-body">${escHtml(responses['judge'])}</div>`;
+    othersEl.appendChild(jcard);
+  }
+
+  if(otherModels.length){
+    const otherGrid=document.createElement('div'); otherGrid.className='responses-grid';
+    otherModels.forEach(m=>{
+      const info=MODELS[m]; const isErr=responses[m].startsWith('Error:');
+      const card=document.createElement('div');
+      card.className=`response-card ${info.cls}-card`;
+      card.innerHTML=`<div class="response-header"><div class="response-model ${info.cls}">${info.label}</div></div><div class="${isErr?'error-text':'response-body'}">${escHtml(responses[m])}</div>`;
+      otherGrid.appendChild(card);
+    });
+    othersEl.appendChild(otherGrid);
+  }
+
+  container.appendChild(othersEl);
+  toggleBtn.addEventListener('click',()=>{
+    const open=othersEl.classList.toggle('open');
+    toggleBtn.textContent=open?'Hide other answers ▴':`See other answers (${othersCount}) ▾`;
+  });
+  return container;
+}
 
 // ── API CALLS ──
 async function fetchModel(model,prompt,imgData,imgType,isImg){
